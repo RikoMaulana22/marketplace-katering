@@ -48,18 +48,17 @@ class OrderController extends Controller
     /**
      * Menampilkan Form Checkout
      */
-    public function checkoutForm($menuId)
+    public function checkoutForm($id)
     {
-        $user = Auth::user();
+        $user = auth()->user();
 
-        // Validasi alamat dan telepon
+        // Kirim menu_id ke halaman setting agar bisa kembali lagi ke sini
         if (empty($user->address) || empty($user->phone)) {
-            return redirect()->route('customer.settings')
-                ->with('error', 'Silakan lengkapi alamat kantor dan nomor telepon terlebih dahulu sebelum melakukan pemesanan.');
+            return redirect()->route('customer.settings', ['menu_id' => $id])
+                ->with('info', 'Lengkapi alamat dulu ya!');
         }
 
-        $menu = Menu::with('merchant')->where('is_available', true)->findOrFail($menuId);
-
+        $menu = \App\Models\Menu::findOrFail($id);
         return view('customer.checkout', compact('menu'));
     }
 

@@ -11,76 +11,54 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Dashboard Utama (Redirect logic biasanya ada di dalam view atau controller dashboard ini)
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', function () {
+        return Auth::user()->role === 'merchant'
+            ? redirect()->route('merchant.dashboard')
+            : view('dashboard');
+    })->name('dashboard');
 
-// --- AKSES UMUM (Semua Role) ---
-Route::middleware('auth')->group(function () {
-    /**
-     * Profil User Dasar (Keamanan: Email & Password)
-     */
+    // Profil Akaun Umum
     Route::get('/account', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/account', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/account', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    /**
-     * Invoice (Halaman cetak/unduh bukti pesanan)
-     */
     Route::get('/orders/invoice/{id}', [OrderController::class, 'showInvoice'])->name('orders.invoice');
 });
 
-// --- PORTAL MERCHANT (KATERING) ---
-Route::middleware(['auth', 'role:merchant'])
-    ->prefix('merchant')
-    ->name('merchant.')
-    ->group(function () {
+/// PORTAL MERCHANT
+Route::middleware(['auth', 'role:merchant'])->prefix('merchant')->name('merchant.')->group(function () {
+    Route::get('/dashboard', [MerchantController::class, 'dashboard'])->name('dashboard');
 
-        Route::get('/dashboard', [MerchantController::class, 'dashboard'])->name('dashboard');
+    // Profile & Business Settings
+    // Kita buat namanya konsisten dengan yang dipanggil di Blade kamu
+    Route::get('/profile/create', [MerchantController::class, 'createProfile'])->name('profile.create');
+    Route::post('/profile/store', [MerchantController::class, 'storeProfile'])->name('profile.store');
 
-        /**
-         * Perbaikan: Nama rute disesuaikan menjadi 'business.edit' 
-         * agar sinkron dengan file navigasi Anda.
-         */
-        Route::get('/business-settings', [MerchantController::class, 'editProfile'])->name('business.edit');
-        Route::put('/business-settings', [MerchantController::class, 'updateProfile'])->name('business.update');
+    // Ini yang krusial: samakan name-nya menjadi 'business.update'
+    Route::get('/business-settings', [MerchantController::class, 'editProfile'])->name('profile.edit');
+    Route::put('/business-settings', [MerchantController::class, 'updateProfile'])->name('business.update');
 
-        // Menu Management
-        Route::resource('menu', MenuController::class);
-        Route::post('/menu/{id}/toggle', [MenuController::class, 'toggleAvailability'])->name('menu.toggle');
+    // Menu
+    Route::resource('menu', MenuController::class);
+    Route::patch('/menu/{id}/toggle', [MenuController::class, 'toggleAvailability'])->name('menu.toggle');
 
-        // Order Management
-        Route::get('/orders', [MerchantController::class, 'orders'])->name('orders.index');
-        Route::get('/orders/{id}', [MerchantController::class, 'showOrder'])->name('orders.show');
-        Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus'])->name('orders.updateStatus');
-    });
+    // Orders
+    Route::get('/orders', [MenuController::class, 'orders'])->name('orders.index');
+    Route::get('/orders/{id}', [MenuController::class, 'showOrder'])->name('orders.show');
+    Route::patch('/orders/{id}/status', [MenuController::class, 'updateStatus'])->name('orders.updateStatus');
+});
 
-// --- PORTAL CUSTOMER (KANTOR) ---
-Route::middleware(['auth', 'role:customer'])
-    ->prefix('customer')
-    ->name('customer.')
-    ->group(function () {
+// PORTAL CUSTOMER
+Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
+    Route::get('/explore', [OrderController::class, 'index'])->name('explore');
+    Route::get('/checkout/{id}', [OrderController::class, 'checkoutForm'])->name('checkout');
+    Route::post('/checkout', [OrderController::class, 'storeOrder'])->name('checkout.store');
+    Route::get('/my-orders', [OrderController::class, 'myOrders'])->name('orders');
+    Route::get('/my-orders/{id}', [OrderController::class, 'showOrderDetail'])->name('orders.show');
 
-        /**
-         * Alamat Pengiriman Kantor
-         */
-        Route::get('/shipping-address', [CustomerProfileController::class, 'edit'])->name('settings');
-        Route::put('/shipping-address', [CustomerProfileController::class, 'update'])->name('settings.update');
-
-        /**
-         * Belanja & Transaksi
-         */
-        Route::get('/explore', [OrderController::class, 'index'])->name('explore');
-        Route::get('/checkout/{menuId}', [OrderController::class, 'checkoutForm'])->name('checkout');
-        Route::post('/checkout', [OrderController::class, 'storeOrder'])->name('checkout.store');
-
-        /**
-         * Manajemen Pesanan Saya
-         */
-        Route::get('/my-orders', [OrderController::class, 'myOrders'])->name('orders');
-        Route::get('/my-orders/{id}', [OrderController::class, 'showOrderDetail'])->name('orders.show'); // TAMBAHAN: Detail pesanan
-        Route::delete('/my-orders/{id}/cancel', [OrderController::class, 'cancelOrder'])->name('orders.cancel'); // TAMBAHAN: Batal pesanan
-    });
+    Route::get('/settings', [CustomerProfileController::class, 'edit'])->name('settings');
+    Route::put('/settings', [CustomerProfileController::class, 'update'])->name('settings.update');
+});
 
 require __DIR__ . '/auth.php';

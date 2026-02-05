@@ -1,84 +1,164 @@
-<div style="padding: 30px; font-family: sans-serif; max-width: 1100px; margin: auto;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0; color: #1f2937;">Riwayat Pesanan Saya</h2>
-        <a href="{{ route('customer.explore') }}"
-            style="text-decoration: none; background: #4F46E5; color: white; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 14px;">
-            + Pesan Lagi
-        </a>
-    </div>
+<x-app-layout>
+    <div class="py-12 bg-gray-50 min-h-screen">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
-    @if(session('success'))
-        <div
-            style="padding: 15px; background: #dcfce7; color: #166534; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bbf7d0;">
-            {{ session('success') }}
+            <div class="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-indigo-950 tracking-tight">
+                        📋 Riwayat Pesanan Saya
+                    </h2>
+                    <p class="text-gray-500 mt-1 font-medium">Pantau status pengiriman dan unduh invoice pesanan kantor
+                        Anda.</p>
+                </div>
+                <a href="{{ route('customer.explore') }}"
+                    class="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 transition-all transform active:scale-95">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Pesan Lagi
+                </a>
+            </div>
+
+            @if(session('success'))
+                <div
+                    class="mb-8 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center text-green-700 font-bold shadow-sm animate-fade-in">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clip-rule="evenodd"></path>
+                    </svg>
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <div
+                class="bg-white overflow-hidden shadow-xl shadow-indigo-100/50 rounded-[2.5rem] border border-gray-100">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50/50 border-b border-gray-100">
+                                <th class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest">
+                                    Detail Order</th>
+                                <th class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest">
+                                    Katering & Menu</th>
+                                <th class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest">
+                                    Jadwal Kirim</th>
+                                <th class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest">Total
+                                    Bayar</th>
+                                <th
+                                    class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest text-center">
+                                    Status</th>
+                                <th
+                                    class="px-8 py-6 text-xs font-black text-indigo-900 uppercase tracking-widest text-center">
+                                    Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            @forelse($orders as $order)
+                                <tr class="hover:bg-indigo-50/20 transition-colors group">
+                                    <td class="px-8 py-6">
+                                        <span
+                                            class="text-sm font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                                            #{{ $order->id }}
+                                        </span>
+                                    </td>
+                                    <td class="px-8 py-6">
+                                        <div class="font-bold text-indigo-950 text-base mb-1">
+                                            {{ $order->merchant->company_name ?? 'Katering Terpilih' }}
+                                        </div>
+                                        <div class="space-y-1">
+                                            @foreach($order->items as $item)
+                                                <p class="text-xs text-gray-500 font-medium flex items-center">
+                                                    <span class="w-1.5 h-1.5 bg-indigo-300 rounded-full mr-2"></span>
+                                                    {{ $item->menu->name }} <span
+                                                        class="ml-1 text-indigo-400">({{ $item->quantity }}x)</span>
+                                                </p>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                    <td class="px-8 py-6">
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-bold text-gray-700">
+                                                {{ \Carbon\Carbon::parse($order->delivery_date)->format('d M Y') }}
+                                            </span>
+                                            <span
+                                                class="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Estimasi
+                                                Siang Hari</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-8 py-6">
+                                        <span class="text-base font-black text-indigo-950">
+                                            Rp {{ number_format($order->total_price, 0, ',', '.') }}
+                                        </span>
+                                    </td>
+                                    <td class="px-8 py-6 text-center">
+                                        @php
+                                            $statusClasses = [
+                                                'pending' => 'bg-amber-100 text-amber-700 border-amber-200',
+                                                'confirmed' => 'bg-indigo-100 text-indigo-700 border-indigo-200',
+                                                'delivered' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                                                'cancelled' => 'bg-rose-100 text-rose-700 border-rose-200',
+                                            ][$order->status] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+                                        @endphp
+                                        <span
+                                            class="inline-flex items-center px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider border {{ $statusClasses }}">
+                                            {{ $order->status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-8 py-6 text-center">
+                                        <a href="{{ route('orders.invoice', $order->id) }}" target="_blank"
+                                            class="inline-flex items-center px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold text-xs shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all group-hover:shadow-md">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Invoice
+                                        </a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-8 py-24 text-center">
+                                        <div class="flex flex-col items-center">
+                                            <div
+                                                class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6">
+                                                <svg class="w-12 h-12 text-indigo-200" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                                </svg>
+                                            </div>
+                                            <h3 class="text-xl font-black text-indigo-950">Belum Ada Pesanan</h3>
+                                            <p class="text-gray-400 mt-2 max-w-xs mx-auto font-medium">Sepertinya Anda belum
+                                                memesan makan siang hari ini. Mari jelajahi katering lezat di sekitar Anda!
+                                            </p>
+                                            <a href="{{ route('customer.explore') }}"
+                                                class="mt-8 text-indigo-600 font-bold hover:underline flex items-center">
+                                                Mulai Cari Katering
+                                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-12 text-center">
+                <a href="{{ route('dashboard') }}"
+                    class="inline-flex items-center text-sm font-bold text-gray-400 hover:text-indigo-600 transition-colors uppercase tracking-widest">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M10 19l-7-7 7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    Kembali ke Dashboard
+                </a>
+            </div>
         </div>
-    @endif
-
-    <div
-        style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-                <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280;">ID Order</th>
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280;">Menu & Katering</th>
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280;">Tgl Pengiriman</th>
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280;">Total Harga</th>
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280;">Status</th>
-                    <th style="padding: 15px; font-size: 14px; color: #6b7280; text-align: center;">Dokumen</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($orders as $order)
-                    <tr style="border-bottom: 1px solid #f3f4f6;">
-                        <td style="padding: 15px; font-weight: bold; color: #4F46E5;">#{{ $order->id }}</td>
-                        <td style="padding: 15px;">
-                            <div style="font-weight: 600; color: #374151;">
-                                {{ $order->merchant->company_name ?? 'Katering' }}</div>
-                            @foreach($order->items as $item)
-                                <div style="font-size: 13px; color: #6b7280;">• {{ $item->menu->name }} ({{ $item->quantity }}x)
-                                </div>
-                            @endforeach
-                        </td>
-                        <td style="padding: 15px; font-size: 14px; color: #374151;">
-                            {{ \Carbon\Carbon::parse($order->delivery_date)->format('d M Y') }}
-                        </td>
-                        <td style="padding: 15px; font-weight: bold; color: #1f2937;">
-                            Rp {{ number_format($order->total_price, 0, ',', '.') }}
-                        </td>
-                        <td style="padding: 15px;">
-                            @php
-                                $statusColor = [
-                                    'pending' => ['bg' => '#fef3c7', 'text' => '#92400e'],
-                                    'confirmed' => ['bg' => '#dbeafe', 'text' => '#1e40af'],
-                                    'delivered' => ['bg' => '#dcfce7', 'text' => '#166534'],
-                                    'cancelled' => ['bg' => '#fee2e2', 'text' => '#991b1b'],
-                                ][$order->status] ?? ['bg' => '#f3f4f6', 'text' => '#374151'];
-                            @endphp
-                            <span
-                                style="padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; background: {{ $statusColor['bg'] }}; color: {{ $statusColor['text'] }}; text-transform: uppercase;">
-                                {{ $order->status }}
-                            </span>
-                        </td>
-                        <td style="padding: 15px; text-align: center;">
-                            <a href="{{ route('orders.invoice', $order->id) }}" target="_blank"
-                                style="display: inline-flex; align-items: center; gap: 5px; text-decoration: none; background: #f3f4f6; color: #4b5563; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid #d1d5db; transition: all 0.2s;"
-                                onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
-                                📄 Invoice
-                            </a>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="6" style="padding: 60px; text-align: center;">
-                            <div style="font-size: 40px; margin-bottom: 10px;">🛒</div>
-                            <div style="color: #6b7280; font-size: 16px;">Belum ada riwayat pesanan.</div>
-                            <a href="{{ route('customer.explore') }}"
-                                style="color: #4F46E5; font-weight: bold; text-decoration: none; margin-top: 10px; display: inline-block;">Cari
-                                katering sekarang →</a>
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
     </div>
-</div>
+</x-app-layout>

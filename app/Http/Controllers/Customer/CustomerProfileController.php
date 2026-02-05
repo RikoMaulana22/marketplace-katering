@@ -19,15 +19,21 @@ class CustomerProfileController extends Controller
     {
         $request->validate([
             'phone' => 'required|string|max:20',
-            'address' => 'required|string|min:10',
+            'address' => 'required|string',
         ]);
 
-        $user = Auth::user();
+        $user = auth()->user();
         $user->update([
             'phone' => $request->phone,
             'address' => $request->address,
         ]);
 
-        return redirect()->back()->with('success', 'Alamat pengiriman berhasil diperbarui.');
+        // Jika ada menu_id, arahkan kembali ke checkout. Jika tidak, kembali ke profil.
+        if ($request->has('menu_id')) {
+            return redirect()->route('customer.checkout', $request->menu_id)
+                ->with('success', 'Alamat disimpan! Silakan lanjutkan pesanan.');
+        }
+
+        return redirect()->route('customer.settings')->with('success', 'Alamat berhasil diperbarui!');
     }
 }
