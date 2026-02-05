@@ -10,6 +10,20 @@ use Illuminate\Support\Facades\Storage;
 
 class MenuController extends Controller
 {
+
+
+    public function dashboard()
+    {
+        $merchantId = auth()->user()->merchant->id;
+
+        $stats = [
+            'total_revenue' => Order::where('merchant_id', $merchantId)->where('status', 'delivered')->sum('total_price'),
+            'pending_orders' => Order::where('merchant_id', $merchantId)->where('status', 'pending')->count(),
+            'orders_today' => Order::where('merchant_id', $merchantId)->whereDate('created_at', now())->count(),
+        ];
+
+        return view('merchant.dashboard', compact('stats'));
+    }
     public function index()
     {
         $menus = Menu::where('merchant_id', auth()->user()->merchant->id)->get();
@@ -25,18 +39,22 @@ class MenuController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'category' => 'required',
+            'price' => 'required|numeric|min:0',
             'description' => 'required',
-            'price' => 'required|numeric',
             'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
+        // Handle File Upload
         $photoPath = $request->file('photo')->store('menus', 'public');
 
+        // Simpan ke Database
         Menu::create([
             'merchant_id' => auth()->user()->merchant->id,
             'name' => $request->name,
-            'description' => $request->description,
+            'category' => $request->category,
             'price' => $request->price,
+            'description' => $request->description,
             'photo' => $photoPath,
         ]);
 
@@ -79,7 +97,7 @@ class MenuController extends Controller
     public function destroy(string $id)
     {
         $menu = Menu::where('merchant_id', auth()->user()->merchant->id)->findOrFail($id);
-        
+
         // Hapus file fisik foto
         Storage::disk('public')->delete($menu->photo);
         $menu->delete();
@@ -113,5 +131,13 @@ class MenuController extends Controller
         $order->update(['status' => $request->status]);
 
         return back()->with('success', 'Status pesanan diperbarui menjadi ' . $request->status);
+    }
+
+    public function toggleAvailability($id)
+    {
+        $menu = Menu::where('id', $id)->where('merchant_id', auth()->user()->merchant->id)->firstOrFail();
+        $menu->update(['is_available' => !$menu->is_available]);
+
+        return back()->with('success', 'Status ketersediaan menu diperbarui.');
     }
 }

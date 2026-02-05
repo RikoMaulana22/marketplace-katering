@@ -1,5 +1,5 @@
 <x-app-layout>
-  
+
 
     <div class="p-6 text-gray-900">
         <h3 class="font-bold text-lg mb-4">Selamat Datang, {{ Auth::user()->name }}!</h3>
@@ -19,6 +19,8 @@
                     Siang</a>
                 <a href="{{ route('customer.orders') }}" class="bg-indigo-500 text-white px-4 py-2 rounded">Riwayat Pesanan
                     Saya</a>
+                <a href="{{ route('customer.settings') }}" class="bg-gray-800 text-white px-4 py-2 rounded">Set Alamat
+                    Kantor</a>
             </div>
         @endif
     </div>

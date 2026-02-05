@@ -8,86 +8,162 @@ use App\Models\Menu;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // Tambahkan DB Transaction untuk keamanan data
 
 class OrderController extends Controller
 {
-
+    /**
+     * Halaman Explore: Mencari Menu Katering
+     */
     public function index(Request $request)
     {
-        $query = Menu::with('merchant');
+        // Optimasi: Gunakan withCount atau Eager Loading untuk menghindari N+1 query
+        $query = Menu::with('merchant')->where('is_available', true); // Hanya tampilkan yang tersedia
 
-        // Fitur Pencarian berdasarkan nama menu atau nama katering
         if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('name', 'like', '%' . $searchTerm . '%')
-                    ->orWhereHas('merchant', function ($merchantQuery) use ($searchTerm) {
-                        $merchantQuery->where('company_name', 'like', '%' . $searchTerm . '%');
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                    ->orWhereHas('merchant', function ($mq) use ($request) {
+                        $mq->where('company_name', 'like', '%' . $request->search . '%');
                     });
             });
         }
 
-        $menus = $query->latest()->get();
+        if ($request->filled('location')) {
+            $query->whereHas('merchant', function ($q) use ($request) {
+                $q->where('address', 'like', '%' . $request->location . '%');
+            });
+        }
+
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
+        // Gunakan pagination jika data sudah banyak agar tidak berat
+        $menus = $query->latest()->paginate(12);
+
         return view('customer.explore', compact('menus'));
     }
 
-    // Method untuk melihat Invoice Detail
-    public function showInvoice($id)
-    {
-        $order = Order::with(['merchant', 'items.menu'])
-            ->where('customer_id', Auth::id())
-            ->findOrFail($id);
-
-        return view('customer.invoice', compact('order'));
-    }
-    // Method untuk menampilkan form (Langkah 5.4 bagian 1)
+    /**
+     * Menampilkan Form Checkout
+     */
     public function checkoutForm($menuId)
     {
-        $menu = Menu::with('merchant')->findOrFail($menuId);
+        $user = Auth::user();
+
+        // Validasi alamat dan telepon
+        if (empty($user->address) || empty($user->phone)) {
+            return redirect()->route('customer.settings')
+                ->with('error', 'Silakan lengkapi alamat kantor dan nomor telepon terlebih dahulu sebelum melakukan pemesanan.');
+        }
+
+        $menu = Menu::with('merchant')->where('is_available', true)->findOrFail($menuId);
+
         return view('customer.checkout', compact('menu'));
     }
 
-    // Method untuk memproses data (Langkah 5.4 bagian 2)
+    /**
+     * Memproses Penyimpanan Pesanan (Checkout)
+     */
     public function storeOrder(Request $request)
     {
         $request->validate([
             'menu_id' => 'required|exists:menus,id',
             'quantity' => 'required|integer|min:1',
             'delivery_date' => 'required|date|after:today',
+            'notes' => 'nullable|string|max:500',
+        ], [
+            'delivery_date.after' => 'Tanggal pengiriman minimal harus satu hari setelah hari ini.'
         ]);
+
+        $user = Auth::user();
+
+        if (empty($user->address)) {
+            return redirect()->route('customer.settings')->with('error', 'Alamat pengiriman belum diatur.');
+        }
 
         $menu = Menu::findOrFail($request->menu_id);
         $totalPrice = $menu->price * $request->quantity;
 
-        // 1. Simpan ke tabel Orders
-        $order = Order::create([
-            'customer_id' => Auth::id(),
-            'merchant_id' => $menu->merchant_id,
-            'delivery_date' => $request->delivery_date,
-            'total_price' => $totalPrice,
-            'status' => 'pending'
-        ]);
+        // Gunakan Database Transaction agar jika satu proses gagal, data tidak "setengah jadi"
+        return DB::transaction(function () use ($request, $user, $menu, $totalPrice) {
 
-        // 2. Simpan ke tabel OrderItems
-        OrderItem::create([
-            'order_id' => $order->id,
-            'menu_id' => $menu->id,
-            'quantity' => $request->quantity,
-            'price_at_purchase' => $menu->price
-        ]);
+            // 1. Simpan Header Pesanan
+            $order = Order::create([
+                'customer_id' => $user->id,
+                'merchant_id' => $menu->merchant_id,
+                'delivery_date' => $request->delivery_date,
+                'total_price' => $totalPrice,
+                'notes' => $request->notes,
+                'status' => 'pending'
+            ]);
 
-        return redirect()->route('customer.orders')->with('success', 'Pesanan berhasil dibuat!');
+            // 2. Simpan Detail Item
+            $order->items()->create([ // Menggunakan relasi model agar lebih clean
+                'menu_id' => $menu->id,
+                'quantity' => $request->quantity,
+                'price_at_purchase' => $menu->price
+            ]);
+
+            return redirect()->route('orders.invoice', $order->id)
+                ->with('success', 'Pesanan berhasil dibuat! Merchant akan segera memverifikasi pesanan Anda.');
+        });
     }
 
+    /**
+     * Menampilkan Invoice
+     */
+    public function showInvoice($id)
+    {
+        // Eager loading relasi yang dibutuhkan saja
+        $order = Order::with(['items.menu', 'merchant', 'customer'])->findOrFail($id);
+        $user = Auth::user();
 
+        // Cek Akses menggunakan Policy atau logic manual yang lebih ketat
+        $isCustomerOwner = ($user->role === 'customer' && $order->customer_id === $user->id);
 
-    // Tambahan: Method untuk melihat daftar pesanan saya
-    // app/Http/Controllers/Customer/OrderController.php
+        // Perbaikan logic merchant agar lebih robust
+        $isMerchantOwner = ($user->role === 'merchant' && $user->merchant && $order->merchant_id === $user->merchant->id);
+
+        if (!$isCustomerOwner && !$isMerchantOwner) {
+            abort(403, 'Anda tidak memiliki izin untuk melihat invoice ini.');
+        }
+
+        return view('orders.invoice', compact('order'));
+    }
+
+    /**
+     * Melihat Daftar Pesanan Saya (Customer)
+     */
     public function myOrders()
     {
-        $orders = Order::where('customer_id', auth()->id())->latest()->get();
+        $orders = Order::with(['items.menu', 'merchant'])
+            ->where('customer_id', Auth::id())
+            ->latest()
+            ->paginate(10); // Gunakan paginate daripada get() untuk performa
 
-        // Pastikan path ini sesuai dengan letak file .blade.php Anda
         return view('customer.index', compact('orders'));
+    }
+
+    /**
+     * Memperbarui Status Pesanan (Merchant)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+
+        $request->validate([
+            'status' => 'required|in:pending,confirmed,delivered,cancelled'
+        ]);
+
+        // Pastikan merchant hanya bisa edit pesanannya sendiri
+        if (!Auth::user()->merchant || Auth::user()->merchant->id !== $order->merchant_id) {
+            abort(403, 'Anda tidak diizinkan mengubah status pesanan ini.');
+        }
+
+        $order->update(['status' => $request->status]);
+
+        return back()->with('success', "Status pesanan #{$order->id} berhasil diperbarui.");
     }
 }
