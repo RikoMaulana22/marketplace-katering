@@ -14,8 +14,7 @@ class Menu extends Model
         'name',
         'description',
         'price',
-        'photo',
-        'is_available' // Tambah ini
+        'photo'
     ];
 
     // Relasi ke Merchant

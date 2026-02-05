@@ -14,14 +14,7 @@ class MenuController extends Controller
 
     public function dashboard()
     {
-        $merchant = auth()->user()->merchant;
-
-        // JIKA MERCHANT KOSONG, LEMPAR KE HALAMAN LAIN (MISAL: FORM BUAT MERCHANT)
-        if (!$merchant) {
-            return redirect()->route('dashboard')->with('error', 'Profil merchant belum dibuat.');
-        }
-
-        $merchantId = $merchant->id;
+        $merchantId = auth()->user()->merchant->id;
 
         $stats = [
             'total_revenue' => Order::where('merchant_id', $merchantId)->where('status', 'delivered')->sum('total_price'),
@@ -33,16 +26,7 @@ class MenuController extends Controller
     }
     public function index()
     {
-        $user = auth()->user();
-        $merchant = $user->merchant;
-
-        // JIKA USER ADALAH MERCHANT TAPI BELUM ISI PROFIL TOKO
-        if (!$merchant) {
-            return redirect()->route('merchant.profile.create')
-                ->with('error', 'Silakan buat profil toko Anda terlebih dahulu sebelum mengelola menu.');
-        }
-
-        $menus = Menu::where('merchant_id', $merchant->id)->get();
+        $menus = Menu::where('merchant_id', auth()->user()->merchant->id)->get();
         return view('merchant.menu.index', compact('menus'));
     }
 
